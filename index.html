@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BATTLESHIP ONLINE</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06080e;font-family:monospace;color:#c0c0c0;overflow-y:auto;min-height:100vh;display:flex;flex-direction:column;align-items:center;-webkit-user-select:none;user-select:none}
+.screen{display:none;width:100%;flex-direction:column;align-items:center;padding:12px}
+.screen.active{display:flex}
+h2{font-size:clamp(13px,3.5vw,16px);color:#88ffaa;letter-spacing:2px;margin:10px 0 6px;text-align:center}
+.sub{font-size:11px;color:#667;text-align:center;margin-bottom:8px}
+#error-box{color:#ff4444;font-size:11px;padding:8px;display:none;text-align:center;max-width:90%}
+table.grid{border-collapse:collapse;margin:0 auto}
+table.grid td{width:30px;height:30px;border:1px solid #2a5080;background:#0e1e30;text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+table.grid th{width:30px;height:22px;font-size:10px;color:#88ffaacc;background:transparent;border:none}
+table.grid td.ship{background:#2a5a3a;border-color:#44aa66}
+table.grid td.hit{background:#5a1a0a}
+table.grid td.miss{background:#143040}
+table.grid td.myship{background:#1a3828}
+table.grid td.myship.hit{background:#5a1a0a}
+table.grid td.sunk{background:#401005}
+.hitX{color:#ff6655;font-size:12px;font-weight:bold}
+.missO{color:#66ddcc;font-size:10px}
+.btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.btn{font-family:monospace;font-size:12px;padding:14px 22px;background:transparent;color:#88ffaa;border:1px solid #88ffaa55;border-radius:3px;cursor:pointer;-webkit-tap-highlight-color:transparent;letter-spacing:1px}
+.btn:disabled{opacity:0.2}
+.btn.big{font-size:15px;padding:18px 32px;border-color:#88ffaa88}
+.btn.warn{color:#ff6655;border-color:#ff665555}
+.ships{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin:4px 0}
+.shipb{font-family:monospace;font-size:10px;padding:7px 9px;background:#0e1e30;color:#667;border:1px solid #1a2a3a;border-radius:2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.shipb.act{background:#1a3a28;color:#88ffaa;border-color:#88ffaa}
+.shipb.done{opacity:0.3}
+.hint{font-size:10px;color:#556;text-align:center;margin:3px 0}
+.code-box{font-size:32px;color:#88ffaa;letter-spacing:8px;text-align:center;margin:12px 0;text-shadow:0 0 12px #88ffaa44}
+.code-input{font-family:monospace;font-size:24px;padding:12px 16px;background:#0e1e30;color:#88ffaa;border:1px solid #88ffaa55;border-radius:3px;text-align:center;letter-spacing:6px;width:200px;text-transform:uppercase;outline:none}
+.code-input:focus{border-color:#88ffaa}
+.waiting{color:#ffbb44;font-size:12px;text-align:center;margin:8px 0;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#cinema{width:100%;max-width:700px;height:28vh;min-height:120px;background:#000;border:1px solid #1a2a3a;position:relative;overflow:hidden;margin-bottom:4px}
+#cinema canvas{width:100%!important;height:100%!important;display:block}
+#ctext{position:absolute;top:4px;left:6px;color:#88ffaa;font-size:10px;font-family:monospace;pointer-events:none;z-index:2;text-shadow:0 0 4px #88ffaa33}
+#cbig{position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-family:monospace;font-weight:bold;text-shadow:2px 2px 0 #000;pointer-events:none;display:none;text-align:center;z-index:3}
+.bsec{display:flex;flex-direction:column;align-items:center;margin:2px 0}
+.bsec h3{font-size:10px;color:#88ffaa;margin-bottom:2px;font-weight:normal;letter-spacing:1px}
+.ifo{display:flex;gap:6px;font-size:10px;margin:4px 0;justify-content:center;flex-wrap:wrap}
+.ifo span{color:#88ffaa}
+.grids{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+#overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000d;z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#overlay.on{display:flex}
+#overlay h1{font-size:22px;font-family:monospace}
+#overlay button{font-family:monospace;font-size:13px;padding:12px 28px;background:transparent;color:#88ffaa;border:1px solid #88ffaa44;cursor:pointer}
+@media(max-width:600px){
+  table.grid td{width:clamp(24px,8vw,30px);height:clamp(24px,8vw,30px)}
+  table.grid th{width:clamp(24px,8vw,30px);font-size:9px}
+  .grids{flex-direction:column;align-items:center}
+}
+</style>
+</head>
+<body>
+<div id="error-box"></div>
+
+<!-- LOBBY -->
+
+<div id="lobby-screen" class="screen active">
+  <h2>BATTLESHIP ONLINE</h2>
+  <div class="sub">Real-time multiplayer naval warfare</div>
+  <div class="btns" style="flex-direction:column;align-items:center;gap:12px;margin-top:20px">
+    <button class="btn big" onclick="createGame()">CREATE GAME</button>
+    <div class="sub">— or —</div>
+    <input class="code-input" id="join-input" placeholder="CODE" maxlength="4">
+    <button class="btn big" onclick="joinGame()">JOIN GAME</button>
+  </div>
+  <div id="lobby-status" class="hint" style="margin-top:12px"></div>
+</div>
+
+<!-- WAITING FOR OPPONENT -->
+
+<div id="wait-screen" class="screen">
+  <h2>GAME CREATED</h2>
+  <div class="sub">Send this code to your opponent:</div>
+  <div class="code-box" id="game-code"></div>
+  <div class="sub">Or send them this link:</div>
+  <div class="hint" id="game-link" style="color:#88ffaa;word-break:break-all;margin:4px 16px"></div>
+  <div class="waiting" id="wait-msg">Waiting for opponent to join...</div>
+</div>
+
+<!-- PLACEMENT -->
+
+<div id="place-screen" class="screen">
+  <h2>DEPLOY YOUR FLEET</h2>
+  <div class="sub">Tap to place · Long-press to remove</div>
+  <div class="ships" id="ship-btns"></div>
+  <div class="btns">
+    <button class="btn" onclick="rotateDir()">ROTATE</button>
+    <button class="btn" onclick="autoPlace()">RANDOM</button>
+    <button class="btn" id="ready-btn" onclick="playerReady()" disabled>READY</button>
+  </div>
+  <div class="hint" id="dir-hint">→ Horizontal</div>
+  <table class="grid" id="pgrid"></table>
+  <div class="waiting" id="place-wait" style="display:none">Waiting for opponent to place ships...</div>
+</div>
+
+<!-- BATTLE -->
+
+<div id="battle-screen" class="screen">
+  <div id="cinema"><div id="ctext">AWAITING TARGET</div><div id="cbig"></div></div>
+  <div class="grids">
+    <div class="bsec"><h3>ENEMY WATERS</h3><table class="grid" id="egrid"></table></div>
+    <div class="bsec"><h3>YOUR FLEET</h3><table class="grid" id="mgrid"></table></div>
+  </div>
+  <div class="ifo">TURN:<span id="i-turn">—</span> SHOTS:<span id="i-shots">0</span> HITS:<span id="i-hits">0</span></div>
+</div>
+
+<div id="overlay"><h1 id="oresult"></h1><button onclick="location.reload()">PLAY AGAIN</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>if(typeof THREE==='undefined'){document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>')}</script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+try {
+
+// ===== FIREBASE =====
+firebase.initializeApp({
+  apiKey: "AIzaSyC54z-Bi235cmGEFokZEnMnfnulSRncqIo",
+  authDomain: "battleship-394be.firebaseapp.com",
+  databaseURL: "https://battleship-394be-default-rtdb.firebaseio.com",
+  projectId: "battleship-394be",
+  storageBucket: "battleship-394be.firebasestorage.app",
+  messagingSenderId: "515689540724",
+  appId: "1:515689540724:web:a3f135ffafb10547daf521"
+});
+var db = firebase.database();
+
+// ===== GAME STATE =====
+var SZ = 10, L = 'ABCDEFGHIJ';
+var FLEET = [{n:'CARRIER',s:5},{n:'BATTLESHIP',s:4},{n:'CRUISER',s:3},{n:'SUBMARINE',s:3},{n:'DESTROYER',s:2}];
+var gameId = null, myRole = null; // 'p1' or 'p2'
+var gameRef = null;
+var board = [], myShips = [];
+var placing = 0, horiz = true, placed = [];
+var shots = 0, hitCount = 0;
+var myTurn = false, gameOver = false, animOn = false;
+
+function mkBoard() { var b=[]; for(var r=0;r<SZ;r++){b[r]=[];for(var c=0;c<SZ;c++)b[r][c]=0;} return b; }
+function showScreen(id) { var screens = document.querySelectorAll('.screen'); for(var i=0;i<screens.length;i++) screens[i].classList.remove('active'); document.getElementById(id).classList.add('active'); }
+function showErr(msg) { var el=document.getElementById('error-box'); el.style.display='block'; el.textContent=msg; }
+function genCode() { var chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; var code=''; for(var i=0;i<4;i++) code+=chars[Math.floor(Math.random()*chars.length)]; return code; }
+
+// Check URL for game code
+var urlParams = new URLSearchParams(window.location.search);
+var urlGame = urlParams.get('game');
+if (urlGame) {
+  document.getElementById('join-input').value = urlGame.toUpperCase();
+}
+
+// ===== CREATE GAME =====
+function createGame() {
+  var code = genCode();
+  gameId = code;
+  myRole = 'p1';
+  gameRef = db.ref('games/' + code);
+  gameRef.set({
+    code: code,
+    state: 'waiting', // waiting, placing, battle, done
+    p1: { ready: false, board: null, shots: null },
+    p2: { ready: false, board: null, shots: null },
+    turn: 'p1',
+    created: Date.now()
+  });
+
+  document.getElementById('game-code').textContent = code;
+  var link = window.location.origin + window.location.pathname + '?game=' + code;
+  document.getElementById('game-link').textContent = link;
+  showScreen('wait-screen');
+
+  // Listen for p2 joining
+  gameRef.child('state').on('value', function(snap) {
+    var st = snap.val();
+    if (st === 'placing') {
+      showScreen('place-screen');
+      initPlacement();
+      listenForBattle();
+    }
+  });
+}
+
+// ===== JOIN GAME =====
+function joinGame() {
+  var code = document.getElementById('join-input').value.toUpperCase().trim();
+  if (code.length !== 4) { document.getElementById('lobby-status').textContent = 'Enter a 4-letter code'; return; }
+
+  gameId = code;
+  myRole = 'p2';
+  gameRef = db.ref('games/' + code);
+
+  document.getElementById('lobby-status').textContent = 'Joining...';
+
+  gameRef.once('value', function(snap) {
+    var data = snap.val();
+    if (!data) { document.getElementById('lobby-status').textContent = 'Game not found'; return; }
+    if (data.state !== 'waiting') { document.getElementById('lobby-status').textContent = 'Game already started'; return; }
+
+    // Join the game
+    gameRef.update({ state: 'placing' });
+    showScreen('place-screen');
+    initPlacement();
+    listenForBattle();
+  });
+}
+
+// ===== PLACEMENT =====
+function initPlacement() {
+  board = mkBoard();
+  placed = [];
+  myShips = [];
+  placing = 0;
+  horiz = true;
+  mkGrid('pgrid', 'tapPlace');
+  mkShipBtns();
+}
+
+function mkGrid(id, click) {
+  var t = document.getElementById(id);
+  var h = '<tr><th></th>';
+  for (var c=0;c<SZ;c++) h+='<th>'+(c+1)+'</th>';
+  h += '</tr>';
+  for (var r=0;r<SZ;r++) {
+    h += '<tr><th>'+L[r]+'</th>';
+    for (var c=0;c<SZ;c++) {
+      h += '<td id="'+id[0]+r+'-'+c+'"'+(click?' onclick="'+click+'('+r+','+c+')"':'')+'>​</td>';
+    }
+    h += '</tr>';
+  }
+  t.innerHTML = h;
+  // Long press
+  if (click) {
+    var lpt = null;
+    t.addEventListener('touchstart', function(e) {
+      var td = e.target; while(td&&td.tagName!=='TD') td=td.parentElement;
+      if(!td||!td.id||td.id[0]!=='p') return;
+      var parts=td.id.substring(1).split('-'); var r2=parseInt(parts[0]),c2=parseInt(parts[1]);
+      lpt=setTimeout(function(){doRemove(r2,c2);lpt=null;},500);
+    }, false);
+    t.addEventListener('touchend', function(){if(lpt)clearTimeout(lpt);lpt=null;}, false);
+    t.addEventListener('touchmove', function(){if(lpt)clearTimeout(lpt);lpt=null;}, false);
+  }
+}
+
+function mkShipBtns() {
+  var h='';
+  for(var i=0;i<FLEET.length;i++) h+='<button class="shipb'+(i===0?' act':'')+'" id="sb'+i+'" onclick="pickShip('+i+')">'+FLEET[i].n+'('+FLEET[i].s+')</button>';
+  document.getElementById('ship-btns').innerHTML=h;
+}
+
+function pickShip(i){if(placed[i])return;placing=i;updShipBtns();}
+function updShipBtns(){for(var i=0;i<FLEET.length;i++){var el=document.getElementById('sb'+i);el.className='shipb'+(placed[i]?' done':(i===placing?' act':''));}}
+function rotateDir(){horiz=!horiz;document.getElementById('dir-hint').textContent=horiz?'\u2192 Horizontal':'\u2193 Vertical';}
+
+function getCells(r,c,sz,h){var cells=[];for(var i=0;i<sz;i++){var cr=h?r:r+i,cc=h?c+i:c;if(cr>=SZ||cc>=SZ)return null;cells.push([cr,cc]);}return cells;}
+function canFit(cells,b){if(!cells)return false;for(var i=0;i<cells.length;i++)if(b[cells[i][0]][cells[i][1]]!==0)return false;return true;}
+
+function tapPlace(r,c){
+  if(placed[placing])return;
+  var sh=FLEET[placing],cells=getCells(r,c,sh.s,horiz);
+  if(!cells||!canFit(cells,board))return;
+  for(var i=0;i<cells.length;i++){board[cells[i][0]][cells[i][1]]=placing+1;document.getElementById('p'+cells[i][0]+'-'+cells[i][1]).className='ship';}
+  placed[placing]=cells;
+  myShips[placing]={n:sh.n,s:sh.s,cells:cells,h:0};
+  updShipBtns();
+  for(var j=0;j<FLEET.length;j++){if(!placed[j]){placing=j;updShipBtns();break;}}
+  var all=true;for(var j=0;j<FLEET.length;j++)if(!placed[j])all=false;
+  document.getElementById('ready-btn').disabled=!all;
+}
+
+function doRemove(r,c){
+  var v=board[r][c];if(!v)return;var idx=v-1;if(!placed[idx])return;
+  var cells=placed[idx];
+  for(var i=0;i<cells.length;i++){board[cells[i][0]][cells[i][1]]=0;document.getElementById('p'+cells[i][0]+'-'+cells[i][1]).className='';}
+  placed[idx]=null;myShips[idx]=null;placing=idx;updShipBtns();
+  document.getElementById('ready-btn').disabled=true;
+}
+
+function autoPlace(){
+  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++){board[r][c]=0;var td=document.getElementById('p'+r+'-'+c);if(td)td.className='';}
+  placed=[];myShips=[];
+  for(var idx=0;idx<FLEET.length;idx++){
+    var ok=false;while(!ok){var h=Math.random()<0.5,r2=Math.floor(Math.random()*SZ),c2=Math.floor(Math.random()*SZ),cells=getCells(r2,c2,FLEET[idx].s,h);
+    if(cells&&canFit(cells,board)){for(var i=0;i<cells.length;i++){board[cells[i][0]][cells[i][1]]=idx+1;var td=document.getElementById('p'+cells[i][0]+'-'+cells[i][1]);if(td)td.className='ship';}
+    placed[idx]=cells;myShips[idx]={n:FLEET[idx].n,s:FLEET[idx].s,cells:cells,h:0};ok=true;}}
+  }
+  updShipBtns();document.getElementById('ready-btn').disabled=false;
+}
+
+// ===== READY =====
+function playerReady() {
+  // Upload board to Firebase (just the grid numbers)
+  var boardData = [];
+  for (var r=0;r<SZ;r++) { boardData[r]=[]; for(var c=0;c<SZ;c++) boardData[r][c]=board[r][c]; }
+  var shipData = [];
+  for (var i=0;i<myShips.length;i++) {
+    shipData.push({n:myShips[i].n, s:myShips[i].s, cells:myShips[i].cells, h:0});
+  }
+  gameRef.child(myRole).update({ ready: true, board: boardData, ships: shipData, shots: {} });
+  document.getElementById('ready-btn').disabled = true;
+  document.getElementById('ready-btn').textContent = 'READY!';
+  document.getElementById('place-wait').style.display = 'block';
+}
+
+function listenForBattle() {
+  // Watch for both players ready
+  gameRef.on('value', function(snap) {
+    var data = snap.val();
+    if (!data) return;
+    if (data.state === 'placing' && data.p1 && data.p2 && data.p1.ready && data.p2.ready) {
+      gameRef.update({ state: 'battle' });
+    }
+    if (data.state === 'battle' && !document.getElementById('battle-screen').classList.contains('active')) {
+      startBattle(data);
+    }
+  });
+}
+
+// ===== BATTLE =====
+var enemyShipsData = null, enemyBoard = null;
+
+function startBattle(data) {
+  showScreen('battle-screen');
+  var opp = myRole === 'p1' ? 'p2' : 'p1';
+  enemyBoard = data[opp].board;
+  enemyShipsData = data[opp].ships;
+
+  // Build grids
+  mkGrid('egrid', 'fire');
+  mkGrid('mgrid', null);
+  for(var r=0;r<SZ;r++) for(var c=0;c<SZ;c++) {
+    if(board[r][c]) document.getElementById('m'+r+'-'+c).className='myship';
+  }
+
+  myTurn = (data.turn === myRole);
+  updTurnDisplay();
+  try { init3D(); } catch(e) { showErr('3D: '+e.message); }
+
+  // Listen for opponent shots
+  var oppShotsRef = gameRef.child(opp + '/shots');
+  oppShotsRef.on('child_added', function(snap) {
+    var shot = snap.val();
+    if (!shot) return;
+    applyEnemyShot(shot.r, shot.c);
+  });
+
+  // Listen for turn changes
+  gameRef.child('turn').on('value', function(snap) {
+    var turn = snap.val();
+    myTurn = (turn === myRole);
+    updTurnDisplay();
+  });
+
+  // Listen for game over
+  gameRef.child('state').on('value', function(snap) {
+    if (snap.val() === 'done') {
+      // Check who won
+      gameRef.once('value', function(gsnap) {
+        var gdata = gsnap.val();
+        if (gdata && gdata.winner) {
+          showEnd(gdata.winner === myRole);
+        }
+      });
+    }
+  });
+}
+
+function updTurnDisplay() {
+  document.getElementById('i-turn').textContent = myTurn ? 'YOUR MOVE' : 'OPPONENT';
+  document.getElementById('ctext').textContent = myTurn ? 'SELECT TARGET' : 'OPPONENT FIRING...';
+}
+
+function fire(r, c) {
+  if (!myTurn || gameOver || animOn) return;
+  // Check if already fired here
+  var td = document.getElementById('e'+r+'-'+c);
+  if (td.className === 'hit' || td.className === 'miss' || td.className === 'sunk') return;
+
+  myTurn = false;
+  shots++;
+  var isHit = enemyBoard[r][c] !== 0;
+  if (isHit) hitCount++;
+
+  // Record shot in Firebase
+  var shotKey = r + '_' + c;
+  var shotData = { r: r, c: c, hit: isHit, t: Date.now() };
+  gameRef.child(myRole + '/shots/' + shotKey).set(shotData);
+
+  // Play animation
+  playAnim(isHit ? 'hit' : 'miss', function() {
+    td.className = isHit ? 'hit' : 'miss';
+    td.innerHTML = isHit ? '<span class="hitX">\u2715</span>' : '<span class="missO">\u2022</span>';
+
+    var sunkName = null;
+    if (isHit) {
+      var si = enemyBoard[r][c] - 1;
+      enemyShipsData[si].h++;
+      if (enemyShipsData[si].h >= enemyShipsData[si].s) {
+        sunkName = enemyShipsData[si].n;
+        var cells = enemyShipsData[si].cells;
+        for (var k=0;k<cells.length;k++) document.getElementById('e'+cells[k][0]+'-'+cells[k][1]).className='sunk';
+      }
+    }
+
+    document.getElementById('i-shots').textContent = shots;
+    document.getElementById('i-hits').textContent = hitCount;
+
+    // Check win
+    var allSunk = true;
+    for (var i=0;i<enemyShipsData.length;i++) if(enemyShipsData[i].h<enemyShipsData[i].s) allSunk=false;
+
+    if (allSunk) {
+      gameOver = true;
+      gameRef.update({ state: 'done', winner: myRole });
+      if (sunkName) playSink(sunkName, function(){ showEnd(true); });
+      else showEnd(true);
+      return;
+    }
+
+    var afterShot = function() {
+      // Switch turn
+      var opp = myRole === 'p1' ? 'p2' : 'p1';
+      gameRef.update({ turn: opp });
+    };
+
+    if (sunkName) playSink(sunkName, afterShot);
+    else afterShot();
+  });
+}
+
+function applyEnemyShot(r, c) {
+  var td = document.getElementById('m'+r+'-'+c);
+  if (!td) return;
+  var isHit = board[r][c] !== 0;
+  if (isHit) {
+    td.className = 'myship hit';
+    td.innerHTML = '<span class="hitX">\u2715</span>';
+    var si = board[r][c] - 1;
+    myShips[si].h++;
+    if (myShips[si].h >= myShips[si].s) {
+      document.getElementById('ctext').textContent = myShips[si].n + ' LOST!';
+      var cells = myShips[si].cells;
+      for (var k=0;k<cells.length;k++) document.getElementById('m'+cells[k][0]+'-'+cells[k][1]).className='sunk';
+    } else {
+      document.getElementById('ctext').textContent = 'HIT AT ' + L[r] + (c+1) + '!';
+    }
+  } else {
+    td.className = 'miss';
+    td.innerHTML = '<span class="missO">\u2022</span>';
+    document.getElementById('ctext').textContent = 'MISS AT ' + L[r] + (c+1);
+  }
+}
+
+function showEnd(won) {
+  gameOver = true;
+  var o=document.getElementById('overlay');o.classList.add('on');
+  var t=document.getElementById('oresult');
+  t.textContent=won?'VICTORY!':'DEFEATED';
+  t.style.color=won?'#88ffaa':'#ff5544';
+}
+
+// ===== THREE.JS (same as single player) =====
+var renderer,camera,intScene,extScene,barrelGrp,breachPvt,shellGrp,powderGrp,flashGrp,flashLt;
+var flyShell,expGrp,expLt,splashGrp,debris=[],smoke=[],tgtShip,activeScn='ext';
+function pm(c,s,e){return new THREE.MeshPhongMaterial({color:c,shininess:s||10,emissive:e||0});}
+function pmt(c,o){return new THREE.MeshPhongMaterial({color:c,transparent:true,opacity:o});}
+function mk(g,m,x,y,z){var o=new THREE.Mesh(g,m);if(x!==undefined)o.position.set(x,y||0,z||0);return o;}
+var ML;
+
+function init3D(){
+  var cinema=document.getElementById('cinema');
+  var w=cinema.clientWidth||300,h=cinema.clientHeight||150;
+  renderer=new THREE.WebGLRenderer({antialias:false});
+  renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+  cinema.insertBefore(renderer.domElement,cinema.firstChild);
+  camera=new THREE.PerspectiveCamera(50,w/h,0.1,200);
+  ML={st:pm(0x6a7078,30),sd:pm(0x4a5058,20),sl:pm(0x8a9098,40),br:pm(0xd4aa3a,60),bl:pm(0xeac85a,70),sh:pm(0xd0b060,30),cp:pm(0xc88040,50),pw:pm(0x4a3a28,5),fl:pm(0x403830,8),wl:pm(0x2e2c28,5),hu:pm(0x667078,15),hd:pm(0x3d4550,10),dk:pm(0x6a5e52,5),rd:pm(0x9b2a2a),bk:pm(0x101010),oc:pm(0x1a5080,40),lb:pm(0xffdd99,5,0xffbb55)};
+  buildInt();buildExt();
+  window.addEventListener('resize',function(){var c2=document.getElementById('cinema');if(!c2||!renderer)return;renderer.setSize(c2.clientWidth,c2.clientHeight);camera.aspect=c2.clientWidth/c2.clientHeight;camera.updateProjectionMatrix();});
+  lastT=performance.now();requestAnimationFrame(tick);
+}
+
+function buildInt(){
+  intScene=new THREE.Scene();intScene.background=new THREE.Color(0x151210);
+  intScene.add(new THREE.AmbientLight(0x554840,0.9));
+  var p1=new THREE.PointLight(0xffbb77,1.8,14);p1.position.set(-1,2.5,0.5);intScene.add(p1);
+  var p2=new THREE.PointLight(0x556688,0.6,10);p2.position.set(-3,1,0);intScene.add(p2);
+  intScene.add(mk(new THREE.BoxGeometry(14,0.25,8),ML.fl,0,-1.7,0));
+  intScene.add(mk(new THREE.BoxGeometry(14,0.3,8),ML.wl,0,3.2,0));
+  intScene.add(mk(new THREE.BoxGeometry(14,5,0.25),ML.wl,0,0.8,-3.7));
+  intScene.add(mk(new THREE.BoxGeometry(0.25,5,8),ML.wl,-7,0.8,0));
+  intScene.add(mk(new THREE.BoxGeometry(0.25,5,8),ML.wl,7,0.8,0));
+  intScene.add(mk(new THREE.SphereGeometry(0.06,6,4),ML.lb,-1,2.5,0.5));
+  barrelGrp=new THREE.Group();intScene.add(barrelGrp);
+  var g=new THREE.CylinderGeometry(0.4,0.46,6,8);g.rotateZ(Math.PI/2);barrelGrp.add(mk(g,ML.st,1.5,0.5,0));
+  g=new THREE.CylinderGeometry(0.26,0.26,6.1,8);g.rotateZ(Math.PI/2);barrelGrp.add(mk(g,ML.bk,1.5,0.5,0));
+  g=new THREE.CylinderGeometry(0.5,0.52,0.15,8);g.rotateZ(Math.PI/2);barrelGrp.add(mk(g,ML.sd,4.5,0.5,0));
+  breachPvt=new THREE.Group();breachPvt.position.set(-1.6,-0.15,0);barrelGrp.add(breachPvt);
+  g=new THREE.CylinderGeometry(0.35,0.35,0.22,8);g.rotateZ(Math.PI/2);breachPvt.add(mk(g,ML.sd,0,0.65,0));
+  g=new THREE.CylinderGeometry(0.3,0.3,0.04,8);g.rotateZ(Math.PI/2);breachPvt.add(mk(g,ML.st,0.12,0.65,0));
+  breachPvt.add(mk(new THREE.CylinderGeometry(0.02,0.02,0.5,4),ML.br,-0.05,1.1,0));
+  var hn=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.15,6),ML.br);hn.rotation.x=Math.PI/2;hn.position.set(0,0.02,0);breachPvt.add(hn);
+  intScene.add(mk(new THREE.BoxGeometry(5,0.05,0.8),ML.sd,-2.5,0.2,0));
+  for(var z=-0.3;z<=0.3;z+=0.6)intScene.add(mk(new THREE.BoxGeometry(5,0.08,0.04),ML.st,-2.5,0.26,z));
+  shellGrp=new THREE.Group();intScene.add(shellGrp);
+  g=new THREE.CylinderGeometry(0.19,0.21,1.6,8);g.rotateZ(Math.PI/2);shellGrp.add(new THREE.Mesh(g,ML.sh));
+  g=new THREE.ConeGeometry(0.19,0.45,8);g.rotateZ(-Math.PI/2);shellGrp.add(mk(g,ML.sh,1.0,0,0));
+  shellGrp.position.set(-5.5,0.45,0);
+  powderGrp=new THREE.Group();intScene.add(powderGrp);
+  for(var i=0;i<2;i++){g=new THREE.CylinderGeometry(0.15,0.15,0.75,8);g.rotateZ(Math.PI/2);powderGrp.add(mk(g,ML.pw,i*0.85,0,0));}
+  powderGrp.position.set(-5.5,0.45,0);
+  flashLt=new THREE.PointLight(0xff8800,0,15);flashLt.position.set(5,0.5,0);intScene.add(flashLt);
+  flashGrp=new THREE.Group();flashGrp.visible=false;intScene.add(flashGrp);
+  for(var i=0;i<5;i++){var a=(i/5)*Math.PI*2,len=0.5+Math.random()*0.4;g=new THREE.ConeGeometry(0.12,len,3);g.rotateZ(-Math.PI/2);g.translate(len/2,0,0);var fm=new THREE.Mesh(g,pm([0xff4400,0xff8800,0xffaa00][i%3],5,[0xff2200,0xff6600,0xff8800][i%3]));fm.rotation.x=a;fm.position.set(4.6,0.5,0);flashGrp.add(fm);}
+  flashGrp.add(mk(new THREE.SphereGeometry(0.3,6,4),pmt(0xffffff,0.9),4.6,0.5,0));
+}
+
+function buildExt(){
+  extScene=new THREE.Scene();extScene.background=new THREE.Color(0x0a1020);extScene.fog=new THREE.Fog(0x0a1020,50,130);
+  extScene.add(new THREE.AmbientLight(0x2a3040,0.8));
+  var dl=new THREE.DirectionalLight(0x99aadd,0.9);dl.position.set(20,30,15);extScene.add(dl);
+  var og=new THREE.PlaneGeometry(200,200,12,12);og.rotateX(-Math.PI/2);
+  var oc=new THREE.Mesh(og,ML.oc);oc.position.y=-1;oc.name='ocean';extScene.add(oc);
+  var sg2=new THREE.BufferGeometry(),sv=[];for(var i=0;i<80;i++){var t=Math.random()*Math.PI*2,p=Math.random()*Math.PI*0.4,r=80;sv.push(r*Math.sin(p)*Math.cos(t),r*Math.cos(p),r*Math.sin(p)*Math.sin(t));}sg2.setAttribute('position',new THREE.Float32BufferAttribute(sv,3));extScene.add(new THREE.Points(sg2,new THREE.PointsMaterial({color:0xffffff,size:0.5})));
+
+  // Our ship placeholder (replaced when GLB loads)
+  var ourShipGroup=new THREE.Group();ourShipGroup.position.set(-18,-1.3,0);extScene.add(ourShipGroup);
+
+  // Target ship placeholder
+  tgtShip=new THREE.Group();tgtShip.visible=false;tgtShip.position.set(45,-100,0);extScene.add(tgtShip);
+
+  // Load GLB model
+  try {
+    var loader = new THREE.GLTFLoader();
+    var modelUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1) + 'ship.glb';
+    loader.load(modelUrl, function(gltf) {
+      var model = gltf.scene;
+      // Figure out the model's bounding box to scale it
+      var box = new THREE.Box3().setFromObject(model);
+      var size = new THREE.Vector3();
+      box.getSize(size);
+      var maxDim = Math.max(size.x, size.y, size.z);
+      var scale = 24 / maxDim; // make the ship about 24 units long
+      model.scale.setScalar(scale);
+      // Center it
+      var center = new THREE.Vector3();
+      box.getCenter(center);
+      model.position.set(-center.x * scale, -center.y * scale - 0.5, -center.z * scale);
+      ourShipGroup.add(model);
+
+      // Clone for target ship
+      var clone = model.clone();
+      clone.scale.setScalar(scale * 0.6); // slightly smaller
+      var c2 = new THREE.Vector3();
+      box.getCenter(c2);
+      clone.position.set(-c2.x * scale * 0.6, -c2.y * scale * 0.6 - 0.3, -c2.z * scale * 0.6);
+      tgtShip.add(clone);
+    }, undefined, function(err) {
+      // Fallback to procedural if model fails to load
+      console.warn('GLB load failed, using procedural ship:', err);
+      ourShipGroup.add(mk(new THREE.BoxGeometry(24,2.5,4),ML.hd,0,-0.3,0));
+      ourShipGroup.add(mk(new THREE.BoxGeometry(22,1,3.6),ML.hu,0,1,0));
+      ourShipGroup.add(mk(new THREE.BoxGeometry(21,0.15,3.4),ML.dk,0,1.6,0));
+      ourShipGroup.add(mk(new THREE.BoxGeometry(4,1.8,2.6),ML.hu,-1,2.5,0));
+      tgtShip.add(new THREE.Mesh(new THREE.BoxGeometry(8,1.5,2.2),ML.hu));
+      tgtShip.add(mk(new THREE.BoxGeometry(7,0.1,2),ML.dk,0,0.8,0));
+    });
+  } catch(e) {
+    console.warn('GLTFLoader not available:', e);
+    ourShipGroup.add(mk(new THREE.BoxGeometry(24,2.5,4),ML.hd,0,-0.3,0));
+    ourShipGroup.add(mk(new THREE.BoxGeometry(22,1,3.6),ML.hu,0,1,0));
+    tgtShip.add(new THREE.Mesh(new THREE.BoxGeometry(8,1.5,2.2),ML.hu));
+  }
+  flyShell=new THREE.Group();flyShell.visible=false;extScene.add(flyShell);
+  bg=new THREE.CylinderGeometry(0.1,0.12,0.8,6);bg.rotateZ(Math.PI/2);flyShell.add(new THREE.Mesh(bg,ML.sh));
+  bg=new THREE.ConeGeometry(0.1,0.25,6);bg.rotateZ(-Math.PI/2);flyShell.add(mk(bg,ML.sh,0.5,0,0));
+  expGrp=new THREE.Group();expGrp.visible=false;extScene.add(expGrp);
+  expGrp.add(new THREE.Mesh(new THREE.SphereGeometry(0.7,6,4),pmt(0xffaa00,0.9)));
+  for(var i=0;i<6;i++){var a1=(i/6)*Math.PI*2,a2=(Math.random()-0.5)*2,len=1+Math.random()*1.5;
+  var sp=new THREE.Mesh(new THREE.ConeGeometry(0.25,len,3),pmt([0xff3300,0xff6600,0xff9900][i%3],0.8));
+  sp.position.set(Math.cos(a1)*0.3,Math.sin(a2)*0.3,Math.sin(a1)*0.3);
+  sp.lookAt(Math.cos(a1)*5,Math.sin(a2)*5,Math.sin(a1)*5);
+  sp.userData={dir:new THREE.Vector3(Math.cos(a1)*Math.cos(a2),Math.sin(a2),Math.sin(a1)*Math.cos(a2))};expGrp.add(sp);}
+  expLt=new THREE.PointLight(0xff6600,0,30);expGrp.add(expLt);
+  splashGrp=new THREE.Group();splashGrp.visible=false;extScene.add(splashGrp);
+  splashGrp.add(mk(new THREE.CylinderGeometry(0.2,0.5,3,6),pmt(0x2a8888,0.6),0,1.5,0));
+  for(var i=0;i<6;i++){var d=new THREE.Mesh(new THREE.SphereGeometry(0.08,4,3),pmt(0x4ecdc4,0.5));d.userData={a:(i/6)*Math.PI*2,sp:2+Math.random()*3,ysp:2+Math.random()*3};splashGrp.add(d);}
+  debris=[];for(var i=0;i<8;i++){var sz=0.06+Math.random()*0.15;var dp=new THREE.Mesh(new THREE.BoxGeometry(sz,sz*0.5,sz*0.7),[ML.hu,ML.hd,ML.dk][i%3]);dp.userData={v:new THREE.Vector3(),rv:new THREE.Vector3()};dp.visible=false;extScene.add(dp);debris.push(dp);}
+  smoke=[];var smg=new THREE.SphereGeometry(0.2,4,3);for(var i=0;i<10;i++){var sm=new THREE.Mesh(smg,pmt(0x444444,0));sm.visible=false;extScene.add(sm);smoke.push({mesh:sm,life:0});}
+}
+
+// ===== ANIMATION ENGINE (same as before) =====
+var PHASES=['bo','sl','pl','bc','pa','fi','rc','tr','tj','im'];
+var PDUR=[800,1100,900,500,300,400,350,600,2000,2000];
+var phase='idle',ptime=0,pidx=-1,outcome='hit',lastT=performance.now(),animCB=null,shake=0;
+var sinkT=0,sinkCB=null;
+function eio(t){return t<0.5?2*t*t:-1+(4-2*t)*t;}
+function eo(t){return 1-(1-t)*(1-t);}
+
+function playAnim(out,cb){
+  outcome=out;animCB=cb;pidx=0;ptime=0;phase=PHASES[0];activeScn='int';animOn=true;shake=0;lastT=performance.now();
+  breachPvt.rotation.z=0;shellGrp.position.set(-5.5,0.45,0);shellGrp.visible=true;powderGrp.position.set(-5.5,0.45,0);powderGrp.visible=true;
+  barrelGrp.position.x=0;flashGrp.visible=false;flashLt.intensity=0;flyShell.visible=false;expGrp.visible=false;splashGrp.visible=false;
+  debris.forEach(function(p){p.visible=false;});smoke.forEach(function(p){p.mesh.visible=false;p.life=0;});
+  tgtShip.visible=(out==='hit');
+  if(out==='hit'){tgtShip.position.set(45,-0.5,0);}else{tgtShip.position.set(45,-100,0);}
+  tgtShip.rotation.set(0,0,0);
+  document.getElementById('cbig').style.display='none';document.getElementById('ctext').textContent='LOADING';
+}
+
+function playSink(name,cb){
+  sinkT=0;sinkCB=cb;activeScn='ext';animOn=true;phase='sink';lastT=performance.now();
+  tgtShip.visible=true;tgtShip.position.set(45,-0.5,0);tgtShip.rotation.set(0,0,0);
+  expGrp.visible=true;expGrp.position.set(45,2,0);expGrp.scale.setScalar(1.2);
+  expGrp.children.forEach(function(c){if(c.userData&&c.userData.dir)c.position.copy(c.userData.dir);if(c.material&&c.material.opacity!==undefined)c.material.opacity=0.6;});
+  expLt.intensity=3;
+  var el=document.getElementById('cbig');el.style.display='block';el.style.color='#ff5544';el.textContent='YOU SUNK MY '+name+'!';
+  document.getElementById('ctext').textContent='SINKING';
+}
+
+function nxtPh(){pidx++;if(pidx>=PHASES.length){phase='idle';animOn=false;tgtShip.visible=false;tgtShip.position.set(45,-100,0);if(animCB){setTimeout(animCB,350);animCB=null;}return;}phase=PHASES[pidx];ptime=0;}
+
+function updAnim(dt){
+  if(phase==='idle')return;var ds=dt/1000;
+  if(phase==='sink'){sinkT+=dt;var t=Math.min(1,sinkT/3000);tgtShip.position.y=-0.5-t*5;tgtShip.rotation.z=t*0.35;tgtShip.rotation.x=t*0.12;var fd=Math.max(0,1-t*1.5);expGrp.children.forEach(function(c){if(c.material&&c.material.opacity!==undefined)c.material.opacity=fd*0.6;});expLt.intensity=fd*3;expGrp.position.y=2+t*2;camera.position.set(32,3+t*2,10);camera.lookAt(45,-t*3,0);if(t>=1){animOn=false;phase='idle';tgtShip.visible=false;tgtShip.position.set(45,-100,0);expGrp.visible=false;expLt.intensity=0;document.getElementById('cbig').style.display='none';if(sinkCB){setTimeout(sinkCB,250);sinkCB=null;}}return;}
+  ptime+=dt;var dur=PDUR[pidx]||1000;var t=Math.min(1,ptime/dur);
+  if(phase==='bo'){breachPvt.rotation.z=eio(t)*1.8;document.getElementById('ctext').textContent='BREACH '+Math.round(t*100)+'%';if(t>=1)nxtPh();}
+  else if(phase==='sl'){shellGrp.position.x=-5.5+eio(t)*7;document.getElementById('ctext').textContent='RAM '+Math.round(t*100)+'%';if(t>=1){shellGrp.visible=false;nxtPh();}}
+  else if(phase==='pl'){powderGrp.position.x=-5.5+eio(t)*5.5;document.getElementById('ctext').textContent='POWDER '+Math.round(t*100)+'%';if(t>=1){powderGrp.visible=false;nxtPh();}}
+  else if(phase==='bc'){breachPvt.rotation.z=1.8*(1-eio(t));document.getElementById('ctext').textContent='SEAL '+Math.round(t*100)+'%';if(t>=1)nxtPh();}
+  else if(phase==='pa'){if(t>=1){document.getElementById('ctext').textContent='FIRE!';nxtPh();}}
+  else if(phase==='fi'){if(t<0.35){flashGrp.visible=true;var fi=eo(t/0.35);flashLt.intensity=fi*6;flashGrp.scale.setScalar(fi);barrelGrp.position.x=-fi*0.4;}else{var f=1-(t-0.35)/0.65;flashLt.intensity=Math.max(0,f*6);flashGrp.scale.setScalar(Math.max(0.01,f));barrelGrp.position.x=-0.4+(1-f)*0.4;}flashGrp.children.forEach(function(c){c.rotation.x+=0.12;});shake=(1-t)*0.15;if(t>=1){flashGrp.visible=false;flashLt.intensity=0;barrelGrp.position.x=0;nxtPh();}}
+  else if(phase==='rc'){shake=Math.max(0,(1-t)*0.06);if(t>=1)nxtPh();}
+  else if(phase==='tr'){if(t>=0.5)activeScn='ext';if(t>=1){flyShell.visible=true;document.getElementById('ctext').textContent='IN FLIGHT';nxtPh();}}
+  else if(phase==='tj'){var ft=eio(t),sx=-16+ft*61,sy=-0.5+Math.sin(ft*Math.PI)*16;flyShell.position.set(sx,sy,0);var nx=-16+eio(Math.min(1,t+0.02))*61,ny=-0.5+Math.sin(eio(Math.min(1,t+0.02))*Math.PI)*16;flyShell.lookAt(nx,ny,0);flyShell.rotateY(-Math.PI/2);if(t<0.9&&Math.random()<0.25){var sp2=null;for(var i=0;i<smoke.length;i++)if(smoke[i].life<=0){sp2=smoke[i];break;}if(sp2){sp2.mesh.visible=true;sp2.mesh.position.copy(flyShell.position);sp2.mesh.scale.setScalar(0.3);sp2.mesh.material.opacity=0.3;sp2.life=1;}}document.getElementById('ctext').textContent='TOF '+(t*7).toFixed(1)+'s';if(t>=0.95)flyShell.visible=false;if(t>=1){flyShell.visible=false;if(outcome==='hit'){expGrp.position.set(45,1,0);expGrp.visible=true;expGrp.scale.setScalar(0.1);debris.forEach(function(p){p.visible=true;p.position.set(45,1,0);p.userData.v.set((Math.random()-0.5)*12,3+Math.random()*8,(Math.random()-0.5)*12);p.userData.rv.set(Math.random()*5,Math.random()*5,Math.random()*5);});}else{splashGrp.position.set(45,-1,1);splashGrp.visible=true;}nxtPh();}}
+  else if(phase==='im'){var el=document.getElementById('cbig');if(outcome==='hit'){var gr=Math.min(1,t*3),fdd=Math.max(0,1-Math.max(0,t-0.35)*1.8);expGrp.scale.setScalar(gr*2.5);expGrp.children.forEach(function(c){if(c.userData&&c.userData.dir)c.position.copy(c.userData.dir).multiplyScalar(gr*2);if(c.material&&c.material.opacity!==undefined)c.material.opacity=fdd*0.8;});expLt.intensity=fdd*gr*8;debris.forEach(function(p){if(!p.visible)return;p.position.add(p.userData.v.clone().multiplyScalar(ds));p.userData.v.y-=12*ds;p.rotation.x+=p.userData.rv.x*ds;if(p.position.y<-2)p.visible=false;});shake=Math.max(0,(1-t)*0.08);if(t>0.2){el.style.display='block';el.style.color='#ff5544';el.textContent='DIRECT HIT';}if(t>=1){expGrp.visible=false;expLt.intensity=0;tgtShip.visible=false;}}else{var gr=Math.min(1,t*3),fdd=Math.max(0,1-Math.max(0,t-0.3)*1.5);splashGrp.children.forEach(function(c){if(c.userData&&c.userData.a!==undefined){c.position.set(Math.cos(c.userData.a)*c.userData.sp*gr,c.userData.ysp*gr-4*gr*gr,Math.sin(c.userData.a)*c.userData.sp*gr);c.material.opacity=fdd*0.5;}if(c.geometry&&c.geometry.type==='CylinderGeometry'){c.scale.set(gr,gr,gr);c.material.opacity=fdd*0.6;}});if(t>0.2){el.style.display='block';el.style.color='#88ffaa';el.textContent='MISS';}if(t>=1){splashGrp.visible=false;tgtShip.visible=false;}}if(t>=1)nxtPh();}
+  smoke.forEach(function(p){if(p.life<=0)return;p.life-=ds*0.5;p.mesh.scale.multiplyScalar(1+ds*0.6);p.mesh.material.opacity=Math.max(0,p.life*0.3);p.mesh.position.y+=ds*0.5;if(p.life<=0)p.mesh.visible=false;});
+}
+
+function tick(time){
+  requestAnimationFrame(tick);var dt=Math.min(50,time-lastT);lastT=time;if(!renderer)return;
+  try{updAnim(dt);}catch(e){console.error(e);phase='idle';animOn=false;if(animCB){animCB();animCB=null;}}
+  var oc=extScene.getObjectByName('ocean');if(oc){var p=oc.geometry.attributes.position.array;var t2=time*0.001;for(var i=0;i<p.length;i+=3)p[i+1]=Math.sin(p[i]*0.3+t2)*0.15+Math.cos(p[i+2]*0.2+t2*0.7)*0.1;oc.geometry.attributes.position.needsUpdate=true;oc.geometry.computeVertexNormals();}
+  if(phase!=='sink'){if(activeScn==='int'){camera.position.set(-4,0.8,2.2);camera.lookAt(2,0.3,0);}else{if(phase==='tj'&&flyShell.visible){var sp3=flyShell.position;camera.position.set(sp3.x-5,sp3.y+2,6);camera.lookAt(sp3.x+8,sp3.y-0.5,0);}else if(phase==='im'){camera.position.set(34,3,10);camera.lookAt(45,0,0);}else{var ot=time*0.0002;camera.position.set(Math.cos(ot)*20,5,Math.sin(ot)*14);camera.lookAt(-8,0,0);}}}
+  if(shake>0){camera.position.x+=(Math.random()-0.5)*shake;camera.position.y+=(Math.random()-0.5)*shake;shake*=0.95;}
+  renderer.render(activeScn==='int'?intScene:extScene,camera);
+}
+
+} catch(e) {
+  var el=document.getElementById('error-box');
+  if(el){el.style.display='block';el.textContent='ERROR: '+e.message;}
+  console.error(e);
+}
+</script>
+
+</body>
+</html>
